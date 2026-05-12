@@ -20,7 +20,16 @@ import {
   saveWeightLogs,
   saveWorkoutSessions,
 } from "@/lib/storage";
-import { STORAGE_ROUTINES } from "@/lib/storageKeys";
+import {
+  STORAGE_ROUTINES,
+  STORAGE_DISMISSED_DEFAULT_ROUTINES,
+} from "@/lib/storageKeys";
+import {
+  buildDefaultScheduleIfApplicable,
+  clearBundledDefaultDismissed,
+  dismissBundledDefaultRoutineName,
+  mergeBundledDefaultRoutines,
+} from "@/lib/defaultRoutinesMerge";
 import {
   createSampleRoutines,
   createSampleSchedule,
@@ -98,6 +107,8 @@ type NextSetContextValue = {
     exercises: WorkoutCompletionExerciseInput[];
   }) => { session: WorkoutSession; summary: WorkoutCompletionSummaryItem[] };
   resetAllData: () => void;
+  /** 기본 6개 루틴 + 월~토 스케줄로 교체. 운동 기록·체중은 그대로 둡니다. */
+  applyDefaultRoutinesAndSchedule: () => void;
   exportJson: () => string;
   importJson: (json: string) => void;
 };
@@ -114,8 +125,20 @@ export function NextSetProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     queueMicrotask(() => {
       seedIfFirstVisit();
-      setRoutines(loadRoutines());
-      setWeeklySchedule(loadWeeklySchedule());
+      let nextRoutines = loadRoutines();
+      const merged = mergeBundledDefaultRoutines(nextRoutines);
+      if (merged.changed) {
+        saveRoutines(merged.next);
+        nextRoutines = merged.next;
+      }
+      let nextSchedule = loadWeeklySchedule();
+      const filled = buildDefaultScheduleIfApplicable(nextRoutines, nextSchedule);
+      if (filled) {
+        saveWeeklySchedule(filled);
+        nextSchedule = filled;
+      }
+      setRoutines(nextRoutines);
+      setWeeklySchedule(nextSchedule);
       setWorkoutSessions(loadWorkoutSessions());
       setWeightLogs(loadWeightLogs());
       setReady(true);
@@ -152,6 +175,8 @@ export function NextSetProvider({ children }: { children: ReactNode }) {
 
   const deleteRoutine = useCallback(
     (id: string) => {
+      const removed = routines.find((r) => r.id === id);
+      if (removed) dismissBundledDefaultRoutineName(removed.name);
       persistRoutines(routines.filter((r) => r.id !== id));
       const sched = { ...weeklySchedule };
       (Object.keys(sched) as ScheduleDayKey[]).forEach((k) => {
@@ -311,11 +336,20 @@ export function NextSetProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("nextset:weeklySchedule");
     localStorage.removeItem("nextset:workoutSessions");
     localStorage.removeItem("nextset:weightLogs");
+    localStorage.removeItem(STORAGE_DISMISSED_DEFAULT_ROUTINES);
     setRoutines([]);
     setWeeklySchedule({});
     setWorkoutSessions([]);
     setWeightLogs([]);
   }, []);
+
+  const applyDefaultRoutinesAndSchedule = useCallback(() => {
+    clearBundledDefaultDismissed();
+    const sampleRoutines = createSampleRoutines();
+    const schedule = createSampleSchedule(sampleRoutines);
+    persistRoutines(sampleRoutines);
+    persistSchedule(schedule);
+  }, [persistRoutines, persistSchedule]);
 
   const exportJson = useCallback(() => {
     const payload: NextSetExport = {
@@ -363,6 +397,7 @@ export function NextSetProvider({ children }: { children: ReactNode }) {
       deleteWeightLog,
       completeWorkout,
       resetAllData,
+      applyDefaultRoutinesAndSchedule,
       exportJson,
       importJson,
     }),
@@ -381,6 +416,7 @@ export function NextSetProvider({ children }: { children: ReactNode }) {
       deleteWeightLog,
       completeWorkout,
       resetAllData,
+      applyDefaultRoutinesAndSchedule,
       exportJson,
       importJson,
     ]

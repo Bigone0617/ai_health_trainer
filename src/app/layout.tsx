@@ -31,8 +31,9 @@ export default function RootLayout({
     <html
       lang="ko"
       className={`${notoSansKr.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full font-sans">
+      <body className="min-h-full font-sans" suppressHydrationWarning>
         <NextSetProvider>
           <AppFrame>{children}</AppFrame>
         </NextSetProvider>

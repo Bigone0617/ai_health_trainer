@@ -15,7 +15,12 @@ import { useNextSet } from "@/providers/nextset-provider";
 const PRESET_SECONDS = [60, 90, 120, 180] as const;
 
 export default function SettingsPage() {
-  const { exportJson, importJson, resetAllData } = useNextSet();
+  const {
+    exportJson,
+    importJson,
+    resetAllData,
+    applyDefaultRoutinesAndSchedule,
+  } = useNextSet();
   const fileRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [restDraft, setRestDraft] = useState(String(DEFAULT_REST_SECONDS));
@@ -119,6 +124,36 @@ export default function SettingsPage() {
             저장
           </button>
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          기본 루틴 (6개 + 주간 스케줄)
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          앱에 들어 있는 **기본 6개 루틴**은, 저장소에 같은 이름이 없으면
+          **자동으로 뒤에 붙습니다**(이미 만든 루틴은 그대로). 기본 루틴을
+          **삭제**하면 그 이름은 다시 자동으로 넣지 않아요. 여기서 다시 넣으면
+          **지금 저장된 모든 루틴과 주간 스케줄이** 가슴/등/하체 등 6개 기본
+          루틴과 월~토 배치로 **교체**되고, 삭제로 막아 둔 이름 목록도
+          초기화돼요. 운동 기록·체중·쉬는 시간 설정은 그대로예요.
+        </p>
+        <button
+          type="button"
+          className="mt-4 min-h-[48px] w-full rounded-xl border border-amber-300 bg-amber-50 text-sm font-semibold text-amber-950 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/70"
+          onClick={() => {
+            if (
+              confirm(
+                "저장된 루틴과 주간 스케줄을 앱에 들어 있는 기본 6개 루틴(월~토)으로 바꿀까요? 지금 만든 루틴은 사라져요. (운동 기록·체중은 유지)"
+              )
+            ) {
+              applyDefaultRoutinesAndSchedule();
+              setStatus("기본 루틴과 스케줄을 적용했어요. 루틴 탭에서 확인해 주세요.");
+            }
+          }}
+        >
+          기본 루틴으로 다시 넣기
+        </button>
       </Card>
 
       <Card>

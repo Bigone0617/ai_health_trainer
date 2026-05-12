@@ -7,7 +7,7 @@ Next.js, TypeScript, Tailwind CSS, Recharts로 만든 **개인용** 웹앱입니
 1. **스캐폴드**: Next.js(App Router) + TypeScript + Tailwind, 차트용 **Recharts** 추가.
 2. **도메인 타입**: 한곳에 모아 두고, 지정한 키 이름으로 **localStorage** 읽기/쓰기.
 3. **점진적 과부하(progressive overload)**: 규칙과 문구를 바꾸기 쉽도록 `progressiveOverload.ts`에 순수 함수로 분리.
-4. **상태**: React Context로 스토리지와 동기화. **최초 실행** 시에만(아직 `nextset:routines` 키가 없을 때) 샘플 루틴·주간 스케줄·오늘 체중 시드. **전체 초기화** 시 시드 없이 비움.
+4. **상태**: React Context로 스토리지와 동기화. **최초 실행** 시에만(아직 `nextset:routines` 키가 없을 때) 샘플 루틴·주간 스케줄·오늘 체중 시드. 이후에도 저장소에 **기본 6개 루틴 이름**이 없으면(사용자가 삭제해 제외한 이름 제외) 자동으로 **누락분만** 붙이고, 주간 스케줄이 **완전히 비어 있을 때만** 월~토 기본 배치를 채움. **전체 초기화** 시 시드 없이 비움.
 5. **화면**: 홈, 루틴(목록·생성·편집), 스케줄, 오늘 운동, 체중, 기록(+상세), 백업/가져오기/초기화용 설정.
 6. **UI**: 모바일 우선, 하단 고정 내비, 카드 레이아웃, 큰 입력 필드, 운동 완료 후 **요약 모달**(종목별 다음 타깃·이유). **앱 문구·날짜 표시는 한국어(ko-KR)**, 본문 폰트는 **Noto Sans KR**.
 
@@ -29,7 +29,7 @@ npm start
 
 ## 최초 실행 시
 
-브라우저에 아직 NextSet 데이터가 없으면, **푸시 데이 / 풀 데이 / 레그 데이** 예시 루틴, 샘플 **주간 스케줄**, 오늘 날짜 **체중** 한 건이 자동으로 들어가 흐름을 바로 써볼 수 있습니다. 이후에는 홈 상단 **데이터** 메뉴에서 JSON보내기·가져오기·전체 초기화를 할 수 있습니다.
+브라우저에 아직 NextSet 데이터가 없으면, **가슴+어깨+삼두 / 등+이두 / 하체 전면+둔근+코어 / 상체 보완 / 하체 후면+둔근+코어 / 전신 가볍게+약점 보완** 등 6개 예시 루틴과 **월~토 스케줄**, 오늘 날짜 **체중** 한 건이 자동으로 들어가 흐름을 바로 써볼 수 있습니다. 이미 루틴 데이터가 있어도 위 **6개 기본 루틴**이 목록에 없으면(이름 기준) **누락된 것만** 뒤에 붙습니다. 사용자가 해당 이름의 루틴을 **삭제**하면, 그 이름은 `nextset:dismissedDefaultRoutineNames`에 기록되어 **다시 자동으로 넣지 않습니다**. 주간 스케줄이 비어 있고 6개가 모두 있을 때만 월~토 예시 배치를 채웁니다. **설정 → 기본 루틴으로 다시 넣기**로 6개 루틴과 월~토 스케줄을 덮어쓰면 삭제 제외 목록도 함께 초기화됩니다.
 
 ## Vercel 배포
 
@@ -80,6 +80,7 @@ vercel
 - `nextset:workoutSessions`
 - `nextset:weightLogs`
 - `nextset:restSeconds` (세트 완료 후 쉬는 시간(초), 설정 화면에서 변경)
+- `nextset:dismissedDefaultRoutineNames` (기본 6개 루틴 이름 중 사용자가 삭제해 자동 추가에서 제외한 목록, JSON 배열)
 
 점진적 과부하 판정 로직: `src/lib/progressiveOverload.ts`
 
@@ -87,4 +88,5 @@ vercel
 
 - 타입 정의: `src/lib/types.ts`
 - 스토리지·Context·운동 완료 처리: `src/providers/nextset-provider.tsx`
+- 기본 루틴 자동 병합·삭제 시 제외: `src/lib/defaultRoutinesMerge.ts`
 - 오늘 운동 UI: `src/app/workout/today/page.tsx` (루틴이 갱신되면 입력 폼이 맞게 다시 잡히도록 `WorkoutRoutineInputs`에 `key` 사용)
