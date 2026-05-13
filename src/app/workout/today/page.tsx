@@ -110,7 +110,7 @@ function WorkoutRoutineInputs({
     [startRestTimer]
   );
 
-  const onComplete = () => {
+  const onComplete = async () => {
     const exercises = sortExercises(routine.exercises).map((ex) => {
       const rows = inputs[ex.id];
       if (!rows || rows.length !== ex.sets) {
@@ -148,7 +148,7 @@ function WorkoutRoutineInputs({
       return;
     }
 
-    const { summary } = completeWorkout({
+    const { summary } = await completeWorkout({
       routineId: routine.id,
       date: todayStr,
       exercises,

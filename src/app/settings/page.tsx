@@ -57,7 +57,7 @@ export default function SettingsPage() {
     if (!file) return;
     try {
       const text = await file.text();
-      importJson(text);
+      await importJson(text);
       setStatus("가져오기가 끝났어요. 화면에 반영됐어요.");
     } catch {
       setStatus("가져오기에 실패했어요. JSON 파일을 확인해 주세요.");

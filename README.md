@@ -1,15 +1,16 @@
 # NextSet — 개인용 운동 기록 MVP
 
-Next.js, TypeScript, Tailwind CSS, Recharts로 만든 **개인용** 웹앱입니다. 데이터는 **localStorage**에만 저장되며, 백엔드와 계정(로그인)은 없습니다.
+Next.js, TypeScript, Tailwind CSS, Recharts로 만든 **개인용** 웹앱입니다. **게스트**면 **localStorage**만 쓰고, **Google / Kakao**로 선택 로그인하면 **Supabase**에 동기화합니다(로그인 필수 아님).
 
 ## 구현 요약
 
 1. **스캐폴드**: Next.js(App Router) + TypeScript + Tailwind, 차트용 **Recharts** 추가.
-2. **도메인 타입**: 한곳에 모아 두고, 지정한 키 이름으로 **localStorage** 읽기/쓰기.
-3. **점진적 과부하(progressive overload)**: 규칙과 문구를 바꾸기 쉽도록 `progressiveOverload.ts`에 순수 함수로 분리.
-4. **상태**: React Context로 스토리지와 동기화. **최초 실행** 시에만(아직 `nextset:routines` 키가 없을 때) 샘플 루틴·주간 스케줄·오늘 체중 시드. 이후에도 저장소에 **기본 6개 루틴 이름**이 없으면(사용자가 삭제해 제외한 이름 제외) 자동으로 **누락분만** 붙이고, 주간 스케줄이 **완전히 비어 있을 때만** 월~토 기본 배치를 채움. **전체 초기화** 시 시드 없이 비움.
-5. **화면**: 홈, 루틴(목록·생성·편집), 스케줄, 오늘 운동, 체중, 기록(+상세), 백업/가져오기/초기화용 설정.
-6. **UI**: 모바일 우선, 하단 고정 내비, 카드 레이아웃, 큰 입력 필드, 운동 완료 후 **요약 모달**(종목별 다음 타깃·이유). **앱 문구·날짜 표시는 한국어(ko-KR)**, 본문 폰트는 **Noto Sans KR**.
+2. **도메인 타입**: 한곳에 모아 두고, 게스트는 **localStorage** 키, 로그인 시 **Supabase** 테이블에 같은 타입으로 저장(`src/lib/storage/`).
+3. **점진적 과부하(progressive overload)**: `progressiveOverload.ts` 순수 함수(게스트·클라우드 동일).
+4. **상태**: `AuthProvider` + `NextSetProvider`. 게스트는 `createLocalWorkoutStorage()`, 로그인 시 `createSupabaseWorkoutStorage()`. **최초 실행**(게스트·`nextset:routines` 없음) 시 샘플 루틴·주간·체중 시드. **기본 6개 루틴** 누락분 병합·삭제 시 `nextset:dismissedDefaultRoutineNames` 제외·빈 스케줄이면 월~토 채움. **전체 초기화**는 현재 모드(로컬 키 vs 해당 계정 Supabase)만 비움.
+5. **OAuth**: Supabase `signInWithOAuth`(google, kakao), `/auth/callback`. 기기에 게스트 데이터가 있으면 로그인 후 **마이그레이션 모달**(병합 / 클라우드만 / 나중에).
+6. **화면**: 홈, 루틴, 스케줄, 오늘 운동, 체중, 기록, 설정, **`/login`**, 상단 **계정 배너**.
+7. **UI**: 모바일 우선, 하단 내비. 계정·동기화 안내도 한국어. 폰트 **Noto Sans KR**.
 
 ## 로컬 실행
 
@@ -33,17 +34,17 @@ npm start
 
 ## Vercel 배포
 
-이 프로젝트는 **백엔드 없음**, **환경 변수 불필요**라서 Vercel 기본 설정으로 배포하면 됩니다.
+게스트만 쓸 때는 **환경 변수 없이** 배포할 수 있습니다. **클라우드 동기화**를 쓰려면 Vercel에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 넣으세요. 값과 Supabase 설정은 **`.env.example`**, 스키마는 **`supabase/migrations/0001_nextset_core.sql`** 를 참고합니다.
 
 ### GitHub 등에 올린 뒤 (권장)
 
 1. 저장소를 GitHub(또는 GitLab/Bitbucket)에 푸시합니다.
-2. [Vercel](https://vercel.com)에 로그인 → **Add New… → Project** → 해당 저장소를 **Import**합니다.
-3. **Framework Preset**이 `Next.js`인지 확인합니다.  
-   - **Build Command**: `npm run build` (기본값)  
-   - **Output Directory**: 비워 두기(Next 기본)  
-   - **Install Command**: `npm install` (기본값)
-4. **Deploy**를 누르면 빌드 후 `*.vercel.app` 주소로 접속할 수 있습니다.
+2. [Vercel](https://vercel.com)에 로그인 → **새 프로젝트 추가** → 해당 저장소를 **가져오기(Import)** 합니다.
+3. **프레임워크**가 `Next.js`인지 확인합니다.  
+   - **빌드 명령**: `npm run build` (기본값)  
+   - **출력 디렉터리**: 비워 두기(Next 기본)  
+   - **설치 명령**: `npm install` (기본값)
+4. **배포(Deploy)** 를 누르면 빌드 후 `*.vercel.app` 주소로 접속할 수 있습니다.
 
 ### Vercel CLI로 배포
 
@@ -57,8 +58,8 @@ vercel
 
 ### 배포 후 알아두기
 
-- 데이터는 **브라우저 localStorage**에만 있어서, **localhost와 배포 URL은 서로 다른 저장소**입니다. 로컬에서 쓰던 데이터를 옮기려면 **데이터 → JSON보내기** 후, 배포 사이트에서 **가져오기**를 사용하세요.
-- 팀/기기마다 데이터가 갈라지므로, “내 전용” 용도에는 적합하고 **서버 동기화는 없습니다**.
+- **게스트**: **localhost와 배포 URL은 서로 다른 localStorage**입니다. 옮기려면 설정의 **JSON보내기/가져오기**를 쓰세요.
+- **로그인**: 같은 계정이면 Supabase로 기기 간 동기화. 로그아웃해도 **클라우드 데이터는 삭제되지 않고**, 로컬 게스트 데이터도 **자동 삭제되지 않습니다**.
 
 ## 라우트(페이지) 안내
 
@@ -72,6 +73,7 @@ vercel
 | `/weight` | 날짜별 체중, 통계, 최근 30일(또는 가능한 구간) 추세 그래프, 최근 목록·삭제 |
 | `/history`, `/history/[id]` | 완료한 운동 목록·볼륨, 상세 세트 |
 | `/settings` | JSON보내기/가져오기, 전체 데이터 초기화 |
+| `/login` | Google·Kakao OAuth(선택), 게스트로 계속하기 |
 
 ## localStorage 키
 
@@ -81,12 +83,25 @@ vercel
 - `nextset:weightLogs`
 - `nextset:restSeconds` (세트 완료 후 쉬는 시간(초), 설정 화면에서 변경)
 - `nextset:dismissedDefaultRoutineNames` (기본 6개 루틴 이름 중 사용자가 삭제해 자동 추가에서 제외한 목록, JSON 배열)
+- `nextset:supabaseMigrated` (로컬→Supabase 마이그레이션 완료 시 설정)
+- `nextset:migrationUiResolved:<userId>` (해당 계정에 대해 동기화 UI를 마친 경우)
 
 점진적 과부하 판정 로직: `src/lib/progressiveOverload.ts`
+
+## 수동 테스트 안내
+
+1. **게스트**: 로그인 없이 루틴·스케줄·운동 완료·체중·새로고침 후 유지 확인.
+2. **OAuth**: `.env.local`에 Supabase URL·anon 키 설정 → 대시보드에 리다이렉트 URL 등록 → `/login`에서 Google 또는 Kakao → 홈으로 돌아온 뒤 상단에 **클라우드 동기화 사용 중**이 보이는지 확인.
+3. **마이그레이션**: 게스트로 데이터 만든 뒤 같은 브라우저에서 로그인 → 모달에서 **지금 동기화** 또는 **이 기기 데이터를 계정에 합치기** → 루틴·기록이 클라우드에 반영되는지 확인. 로컬 `nextset:*` 키는 그대로 두는 것이 목표입니다.
+4. **충돌**: 클라우드에 이미 데이터가 있는 계정으로, 로컬에도 게스트 데이터가 있는 상태에서 로그인 → **이 기기 데이터를 계정에 합치기** / **클라우드 데이터만 사용** / **나중에** 각각 확인.
 
 ## 참고 코드 위치
 
 - 타입 정의: `src/lib/types.ts`
-- 스토리지·Context·운동 완료 처리: `src/providers/nextset-provider.tsx`
+- 스토리지·운동 완료 처리: `src/providers/nextset-provider.tsx`
+- 스토리지 추상화: `src/lib/storage/` (`localPersistence`, `localStorageAdapter`, `supabaseAdapter`, `migrateLocalToSupabase.ts`)
+- Supabase 브라우저 클라이언트: `src/lib/supabase/client.ts`
+- OAuth 콜백: `src/app/auth/callback/route.ts`
+- 인증 Context: `src/providers/auth-provider.tsx`
 - 기본 루틴 자동 병합·삭제 시 제외: `src/lib/defaultRoutinesMerge.ts`
 - 오늘 운동 UI: `src/app/workout/today/page.tsx` (루틴이 갱신되면 입력 폼이 맞게 다시 잡히도록 `WorkoutRoutineInputs`에 `key` 사용)

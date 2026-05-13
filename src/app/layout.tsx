@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Noto_Sans_KR } from "next/font/google";
-import { AppFrame } from "@/components/AppFrame";
+import { AuthProvider } from "@/providers/auth-provider";
 import { NextSetProvider } from "@/providers/nextset-provider";
+import { AppFrame } from "@/components/AppFrame";
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -34,9 +35,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full font-sans" suppressHydrationWarning>
-        <NextSetProvider>
-          <AppFrame>{children}</AppFrame>
-        </NextSetProvider>
+        <AuthProvider>
+          <NextSetProvider>
+            <AppFrame>{children}</AppFrame>
+          </NextSetProvider>
+        </AuthProvider>
       </body>
     </html>
   );
