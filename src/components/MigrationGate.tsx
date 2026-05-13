@@ -13,6 +13,7 @@ import {
   SESSION_MIGRATION_DISMISS,
 } from "@/lib/storageKeys";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSupabasePublicConfigured } from "@/lib/supabase/publicEnv";
 import { useAuth } from "@/providers/auth-provider";
 import { useNextSet } from "@/providers/nextset-provider";
 
@@ -79,9 +80,9 @@ export function MigrationGate() {
     setBusy(true);
     setMessage(null);
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!url || !anon) throw new Error("Supabase가 설정되지 않았습니다.");
+      if (!isSupabasePublicConfigured()) {
+        throw new Error("Supabase가 설정되지 않았습니다.");
+      }
       const client = createSupabaseBrowserClient();
       await migrateLocalIntoSupabase(client, user.id, {
         overwriteWeeklyScheduleWithLocal: overwriteSchedule,

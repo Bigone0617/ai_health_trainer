@@ -1,5 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  getSupabasePublicAnonKey,
+  getSupabasePublicUrl,
+} from "@/lib/supabase/publicEnv";
 
 /**
  * OAuth 리다이렉트 처리. Supabase 대시보드 → Authentication → URL configuration에 등록:
@@ -13,8 +17,8 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabasePublicUrl();
+  const anon = getSupabasePublicAnonKey();
   if (!url || !anon) {
     return NextResponse.redirect(new URL("/login?error=auth", origin));
   }

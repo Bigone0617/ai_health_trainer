@@ -34,7 +34,7 @@ npm start
 
 ## Vercel 배포
 
-게스트만 쓸 때는 **환경 변수 없이** 배포할 수 있습니다. **클라우드 동기화**를 쓰려면 Vercel에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 넣으세요. 값과 Supabase 설정은 **`.env.example`**, 스키마는 **`supabase/migrations/0001_nextset_core.sql`** 를 참고합니다.
+게스트만 쓸 때는 **환경 변수 없이** 배포할 수 있습니다. **클라우드·Kakao 로그인**을 쓰려면 Vercel Production에 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`를 넣고, Kakao 리다이렉트 URI와 맞추려면 **`NEXT_PUBLIC_SITE_URL`**(배포 도메인, 예: `https://xxx.vercel.app`)도 넣는 것을 권장합니다. 자세한 내용은 루트 **`.env`**(주석 템플릿), **`.env.example`**, `next.config.ts`의 `loadEnvConfig` 설명을 참고하세요. 스키마는 **`supabase/migrations/0001_nextset_core.sql`** 입니다.
 
 ### GitHub 등에 올린 뒤 (권장)
 

@@ -10,7 +10,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getOAuthRedirectBase } from "@/lib/env/oauthRedirectBase";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSupabasePublicConfigured } from "@/lib/supabase/publicEnv";
 
 type AuthContextValue = {
   user: User | null;
@@ -23,9 +25,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function getBrowserClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return null;
+  if (!isSupabasePublicConfigured()) return null;
   return createSupabaseBrowserClient();
 }
 
@@ -33,10 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const supabaseConfigured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabaseConfigured = isSupabasePublicConfigured();
 
   useEffect(() => {
     const client = getBrowserClient();
@@ -70,12 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!client) {
       throw new Error("Supabase가 설정되지 않았습니다.");
     }
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
+    const base = getOAuthRedirectBase();
     await client.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${origin}/auth/callback`,
+        redirectTo: `${base}/auth/callback`,
       },
     });
   }, []);

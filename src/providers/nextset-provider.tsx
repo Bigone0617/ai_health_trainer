@@ -28,6 +28,7 @@ import {
   createSampleWeightLog,
 } from "@/lib/sampleData";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSupabasePublicConfigured } from "@/lib/supabase/publicEnv";
 import { useAuth } from "@/providers/auth-provider";
 import type {
   Routine,
@@ -54,9 +55,7 @@ function sortExercises(exercises: RoutineExercise[]): RoutineExercise[] {
 }
 
 function getSupabaseBrowserOrNull() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return null;
+  if (!isSupabasePublicConfigured()) return null;
   return createSupabaseBrowserClient();
 }
 

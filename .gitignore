@@ -31,7 +31,9 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
-.env*
+# IDE에서 보기 쉬운 로컬 사본 — 내용은 .env.local 과 맞추고, 커밋하지 마세요
+.env.local
+local.env
 
 # vercel
 .vercel

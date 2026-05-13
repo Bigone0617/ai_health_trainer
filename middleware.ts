@@ -1,5 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  getSupabasePublicAnonKey,
+  getSupabasePublicUrl,
+} from "@/lib/supabase/publicEnv";
 
 /**
  * 이동 시 Supabase 인증 쿠키를 갱신합니다.
@@ -12,8 +16,8 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabasePublicUrl();
+  const anon = getSupabasePublicAnonKey();
   if (!url || !anon) {
     return supabaseResponse;
   }

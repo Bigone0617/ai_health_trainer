@@ -63,7 +63,13 @@ function LoginContent() {
           <code className="break-all rounded bg-zinc-200 px-1 dark:bg-zinc-800">
             https://&lt;도메인&gt;/auth/callback
           </code>
-          을 등록하세요.
+          을 등록하세요. 배포 URL을 고정하려면 루트{" "}
+          <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">.env</code>
+          또는 Vercel 환경 변수에{" "}
+          <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">
+            NEXT_PUBLIC_SITE_URL
+          </code>
+          (끝 슬래시 없이)을 넣을 수 있어요.
         </p>
       )}
 
