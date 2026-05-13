@@ -1,19 +1,50 @@
 /**
  * OAuth `redirectTo`에 쓸 사이트 베이스 URL.
  *
- * 배포 시 `.env` 또는 `.env.production`(또는 Vercel Production 환경 변수)에
- * `NEXT_PUBLIC_SITE_URL`을 넣으면 Kakao·Supabase에 등록한 리다이렉트 URI와
- * 정확히 일치시키기 쉽습니다. (끝 슬래시 없이, 예: https://my-app.vercel.app)
+ * - **로컬**(`localhost` 등): 항상 현재 탭의 `origin`만 사용합니다.
+ *   (`.env`에 프로덕션 URL이 있어도 로컬 카카오 테스트는 localhost로 갑니다.)
  *
- * 비어 있으면 브라우저 `window.location.origin`을 사용합니다(로컬 개발에 적합).
+ * - **배포**(Vercel 등): `NEXT_PUBLIC_SITE_URL`이 있고 localhost가 **아니면** 그 값을 쓰고,
+ *   없거나 localhost로 잘못 넣었으면 **현재 탭 origin**을 씁니다.
+ *   (Vercel에 실수로 localhost만 넣어도 배포 URL로 리다이렉트되게 합니다.)
+ *
+ * Supabase 대시보드 → Authentication → URL configuration에도
+ * `https://<배포도메인>/auth/callback` 을 등록해야 합니다.
  */
+
+function looksLikeLocalhost(url: string): boolean {
+  const s = url.trim().toLowerCase();
+  if (!s) return false;
+  try {
+    const u = new URL(s.includes("://") ? s : `https://${s}`);
+    return (
+      u.hostname === "localhost" ||
+      u.hostname === "127.0.0.1" ||
+      u.hostname === "[::1]"
+    );
+  } catch {
+    return /localhost|127\.0\.0\.1/.test(s);
+  }
+}
+
 export function getOAuthRedirectBase(): string {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (raw) {
-    return raw.replace(/\/+$/, "");
-  }
+  const fromEnv = (process.env.NEXT_PUBLIC_SITE_URL ?? "")
+    .trim()
+    .replace(/\/+$/, "");
+
   if (typeof window !== "undefined") {
-    return window.location.origin;
+    const origin = window.location.origin;
+
+    if (looksLikeLocalhost(origin)) {
+      return origin;
+    }
+
+    if (fromEnv && !looksLikeLocalhost(fromEnv)) {
+      return fromEnv;
+    }
+    return origin;
   }
+
+  if (fromEnv) return fromEnv;
   return "";
 }

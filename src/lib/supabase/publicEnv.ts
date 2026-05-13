@@ -8,7 +8,8 @@
  *
  * Kakao 로그인은 Supabase Auth를 거치므로, 위 두 값이 맞으면 배포 URL에서도 동일하게 동작합니다.
  * 리다이렉트 URI는 Supabase 대시보드에 `https://<배포도메인>/auth/callback`을 등록하세요.
- * (선택) `NEXT_PUBLIC_SITE_URL`로 OAuth `redirectTo` 베이스를 고정할 수 있습니다.
+ * (선택) `NEXT_PUBLIC_SITE_URL` — 배포 도메인 고정. **localhost 문자열은 넣지 마세요.**
+ *   배포 사이트에서는 비우거나 실제 `https://…vercel.app`만 넣으면 됩니다.
  */
 
 export function getSupabasePublicUrl(): string {
