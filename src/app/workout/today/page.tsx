@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/Card";
 import { formatLocalDate, getScheduleDayKey } from "@/lib/dateUtils";
+import {
+  cancelRestEndInServiceWorker,
+  registerRestTimerServiceWorker,
+  requestRestNotificationPermissionIfDefault,
+  scheduleRestEndInServiceWorker,
+  showRestEndedNotification,
+} from "@/lib/restEndNotification";
 import { loadRestSeconds } from "@/lib/restTimerSettings";
 import type { Routine, RoutineExercise } from "@/lib/types";
 import {
@@ -42,6 +49,10 @@ function buildInitialChecks(routine: Routine): Record<string, boolean[]> {
   return next;
 }
 
+const REST_LAST_SECONDS_CHIME_SRC = "/audio/4second.mp3";
+/** 휴식 종료 N초 전 알림음 (mp3 길이와 맞추면 자연스럽게 이어짐) */
+const REST_CHIME_MS_BEFORE_END = 4000;
+
 function formatRestClock(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
   const m = Math.floor(s / 60);
@@ -69,8 +80,96 @@ function WorkoutRoutineInputs({
       return d?.setChecks ?? buildInitialChecks(routine);
     }
   );
-  const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
-  const [restTotal, setRestTotal] = useState(() => loadRestSeconds());
+  const [restSession, setRestSession] = useState<{
+    endsAt: number;
+    totalSec: number;
+  } | null>(null);
+  /** 타이머 UI를 주기적으로 다시 그리기 위한 틱(백그라운드 복귀 시에도 endsAt 기준으로 맞춤) */
+  const [restTick, setRestTick] = useState(0);
+  const restSessionRef = useRef(restSession);
+  const hideAfterZeroRef = useRef(false);
+  const restChimePlayedRef = useRef(false);
+  const restChimeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const restEndNotifiedRef = useRef(false);
+
+  useEffect(() => {
+    void registerRestTimerServiceWorker();
+  }, []);
+
+  useEffect(() => {
+    restSessionRef.current = restSession;
+  }, [restSession]);
+
+  void restTick;
+  const restSecondsLeft =
+    restSession === null
+      ? null
+      : Math.max(
+          0,
+          // eslint-disable-next-line react-hooks/purity -- 휴식 타이머는 시계 기준 남은 초
+          Math.ceil((restSession.endsAt - Date.now()) / 1000)
+        );
+  const restTotal = restSession?.totalSec ?? 1;
+
+  useEffect(() => {
+    if (restSession === null) {
+      hideAfterZeroRef.current = false;
+      restChimePlayedRef.current = false;
+      restEndNotifiedRef.current = false;
+      cancelRestEndInServiceWorker();
+      return;
+    }
+
+    const tick = () => {
+      setRestTick((n) => n + 1);
+      const s = restSessionRef.current;
+      if (!s) return;
+      const now = Date.now();
+      const msLeft = s.endsAt - now;
+      if (
+        msLeft > 0 &&
+        msLeft <= REST_CHIME_MS_BEFORE_END &&
+        !restChimePlayedRef.current
+      ) {
+        restChimePlayedRef.current = true;
+        if (!restChimeAudioRef.current) {
+          restChimeAudioRef.current = new Audio(REST_LAST_SECONDS_CHIME_SRC);
+        }
+        const a = restChimeAudioRef.current;
+        a.currentTime = 0;
+        void a.play().catch(() => {});
+      }
+      const left = Math.max(0, Math.ceil((s.endsAt - now) / 1000));
+      if (left <= 0) {
+        if (!restEndNotifiedRef.current) {
+          restEndNotifiedRef.current = true;
+          void showRestEndedNotification();
+        }
+        if (!hideAfterZeroRef.current) {
+          hideAfterZeroRef.current = true;
+          window.setTimeout(() => {
+            setRestSession(null);
+            hideAfterZeroRef.current = false;
+          }, 600);
+        }
+      }
+    };
+
+    tick();
+    const id = window.setInterval(tick, 500);
+
+    const onResume = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
+
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
+  }, [restSession]);
 
   const draftRef = useRef({ inputs, setChecks });
   useEffect(() => {
@@ -102,29 +201,34 @@ function WorkoutRoutineInputs({
     };
   }, [routine.id, todayStr]);
 
-  useEffect(() => {
-    if (restSecondsLeft === null) return undefined;
-    if (restSecondsLeft <= 0) {
-      const hide = setTimeout(() => setRestSecondsLeft(null), 600);
-      return () => clearTimeout(hide);
-    }
-    const id = setInterval(() => {
-      setRestSecondsLeft((prev) => {
-        if (prev === null || prev <= 1) return 0;
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [restSecondsLeft]);
-
   const startRestTimer = useCallback(() => {
+    hideAfterZeroRef.current = false;
+    restChimePlayedRef.current = false;
+    restEndNotifiedRef.current = false;
+    requestRestNotificationPermissionIfDefault();
+    const prev = restChimeAudioRef.current;
+    if (prev) {
+      prev.pause();
+      prev.currentTime = 0;
+    }
     const sec = loadRestSeconds();
-    setRestTotal(sec);
-    setRestSecondsLeft(sec);
+    const endsAt = Date.now() + sec * 1000;
+    scheduleRestEndInServiceWorker(endsAt);
+    setRestSession({ endsAt, totalSec: sec });
+    setRestTick((n) => n + 1);
   }, []);
 
   const skipRestTimer = useCallback(() => {
-    setRestSecondsLeft(null);
+    const a = restChimeAudioRef.current;
+    if (a) {
+      a.pause();
+      a.currentTime = 0;
+    }
+    restChimePlayedRef.current = false;
+    restEndNotifiedRef.current = false;
+    cancelRestEndInServiceWorker();
+    setRestSession(null);
+    hideAfterZeroRef.current = false;
   }, []);
 
   const updateSet = useCallback(

@@ -87,6 +87,12 @@ export default function SettingsPage() {
           {restSecondsBounds.min}~{restSecondsBounds.max}초 사이로 맞출 수
           있어요.
         </p>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          휴식이 끝나면 브라우저 알림을 띄울 수 있어요. 처음 세트 완료를 누를 때
+          알림 허용을 물어보면 허용해 주세요. 다른 앱을 보는 중에도 알림이 가려면
+          OS·브라우저가 백그라운드 탭을 허용하는 경우가 많고, 일부 환경(특히
+          일반 Safari 탭)에서는 제한될 수 있어요.
+        </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {PRESET_SECONDS.map((sec) => (
             <button
