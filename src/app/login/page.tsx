@@ -29,8 +29,8 @@ function LoginContent() {
           운동 데이터 백업
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          계정 없이도 NextSet을 쓸 수 있어요. Google 또는 Kakao로 로그인하면
-          루틴·운동 기록·체중을 기기 간에 동기화할 수 있어요.
+          계정 없이도 NextSet을 쓸 수 있어요. Kakao로 로그인하면 루틴·운동
+          기록·체중을 기기 간에 동기화할 수 있어요.
         </p>
       </div>
 
@@ -64,7 +64,9 @@ function LoginContent() {
             https://&lt;도메인&gt;/auth/callback
           </code>
           을 등록하세요. 배포 URL을 고정하려면 루트{" "}
-          <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">.env</code>
+          <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">
+            .env
+          </code>
           또는 Vercel 환경 변수에{" "}
           <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">
             NEXT_PUBLIC_SITE_URL

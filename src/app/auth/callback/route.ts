@@ -10,7 +10,7 @@ import {
  * - 사이트 URL: 예) http://localhost:3000(개발) 또는 프로덕션 origin
  * - 리다이렉트 URL: http://localhost:3000/auth/callback 및 https://<배포도메인>/auth/callback
  *
- * Authentication → Providers에서 Google·Kakao를 켜세요.
+ * Authentication → Providers에서 Kakao를 켜세요.
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);

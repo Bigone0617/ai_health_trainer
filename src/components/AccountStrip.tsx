@@ -66,8 +66,8 @@ export function AccountStrip() {
         게스트 모드: 데이터는 이 기기에만 저장됩니다.
       </p>
       <p className="mt-1 text-zinc-600 dark:text-zinc-400">
-        로그인하면 Google 또는 Kakao로 루틴·운동·체중을 백업하고 다른 기기에서도
-        쓸 수 있어요.
+        Kakao로 로그인하면 루틴·운동·체중을 백업하고 다른 기기에서도 쓸 수
+        있어요.
       </p>
       {supabaseConfigured ? (
         <Link
