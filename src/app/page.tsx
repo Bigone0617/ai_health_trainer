@@ -8,6 +8,8 @@ import { useNextSet } from "@/providers/nextset-provider";
 
 const DATE_LOCALE = "ko-KR";
 
+const SHARE_APP_URL = "https://ai-health-trainer.vercel.app/";
+
 export default function HomePage() {
   const {
     ready,
@@ -27,6 +29,45 @@ export default function HomePage() {
   const todayWeight = weightLogs.find((l) => l.date === todayStr);
 
   const [weightInput, setWeightInput] = useState("");
+  const [shareHint, setShareHint] = useState<string | null>(null);
+
+  const onShareApp = async () => {
+    setShareHint(null);
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({
+          title: "NextSet — 운동 기록",
+          text: "NextSet 운동 기록 앱",
+          url: SHARE_APP_URL,
+        });
+        return;
+      }
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(SHARE_APP_URL);
+        setShareHint("링크를 복사했어요.");
+        window.setTimeout(() => setShareHint(null), 2500);
+        return;
+      }
+      window.prompt("아래 링크를 복사해 주세요.", SHARE_APP_URL);
+    } catch (err: unknown) {
+      const aborted =
+        err &&
+        typeof err === "object" &&
+        "name" in err &&
+        (err as { name: string }).name === "AbortError";
+      if (aborted) return;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(SHARE_APP_URL);
+          setShareHint("링크를 복사했어요.");
+          window.setTimeout(() => setShareHint(null), 2500);
+        }
+      } catch {
+        setShareHint("공유에 실패했어요. 링크를 직접 복사해 주세요.");
+        window.setTimeout(() => setShareHint(null), 3000);
+      }
+    }
+  };
 
   if (!ready) {
     return (
@@ -45,17 +86,31 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <header className="flex items-center justify-between gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           NextSet
         </h1>
-        <Link
-          href="/settings"
-          className="text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-        >
-          데이터
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => void onShareApp()}
+            className="min-h-[40px] rounded-lg border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+          >
+            공유하기
+          </button>
+          <Link
+            href="/settings"
+            className="min-h-[40px] inline-flex items-center text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+          >
+            데이터
+          </Link>
+        </div>
       </header>
+      {shareHint && (
+        <p className="-mt-2 text-sm text-zinc-600 dark:text-zinc-400" role="status">
+          {shareHint}
+        </p>
+      )}
 
       <Card>
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
