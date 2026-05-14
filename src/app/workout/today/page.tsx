@@ -2,11 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/Card";
 import { formatLocalDate, getScheduleDayKey } from "@/lib/dateUtils";
 import { loadRestSeconds } from "@/lib/restTimerSettings";
 import type { Routine, RoutineExercise } from "@/lib/types";
+import {
+  clearWorkoutDraft,
+  loadWorkoutDraft,
+  saveWorkoutDraft,
+} from "@/lib/workoutDraftStorage";
 import {
   useNextSet,
   type WorkoutCompletionSummaryItem,
@@ -54,10 +59,48 @@ function WorkoutRoutineInputs({
   onCompleted: (summary: WorkoutCompletionSummaryItem[]) => void;
 }) {
   const { completeWorkout } = useNextSet();
-  const [inputs, setInputs] = useState(() => buildInitialInputs(routine));
-  const [setChecks, setSetChecks] = useState(() => buildInitialChecks(routine));
+  const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => {
+    const d = loadWorkoutDraft(routine.id, todayStr, routine);
+    return d?.inputs ?? buildInitialInputs(routine);
+  });
+  const [setChecks, setSetChecks] = useState<Record<string, boolean[]>>(
+    () => {
+      const d = loadWorkoutDraft(routine.id, todayStr, routine);
+      return d?.setChecks ?? buildInitialChecks(routine);
+    }
+  );
   const [restSecondsLeft, setRestSecondsLeft] = useState<number | null>(null);
   const [restTotal, setRestTotal] = useState(() => loadRestSeconds());
+
+  const draftRef = useRef({ inputs, setChecks });
+  useEffect(() => {
+    draftRef.current = { inputs, setChecks };
+  }, [inputs, setChecks]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      saveWorkoutDraft(routine.id, todayStr, {
+        inputs: draftRef.current.inputs,
+        setChecks: draftRef.current.setChecks,
+      });
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [inputs, setChecks, routine.id, todayStr]);
+
+  useEffect(() => {
+    const flush = () => {
+      saveWorkoutDraft(routine.id, todayStr, draftRef.current);
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [routine.id, todayStr]);
 
   useEffect(() => {
     if (restSecondsLeft === null) return undefined;
@@ -153,6 +196,7 @@ function WorkoutRoutineInputs({
       date: todayStr,
       exercises,
     });
+    clearWorkoutDraft(routine.id, todayStr);
     onCompleted(summary);
   };
 
