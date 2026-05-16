@@ -73,6 +73,63 @@ export function clearWorkoutDraft(routineId: string, date: string): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.removeItem(workoutDraftKey(routineId, date));
+    sessionStorage.removeItem(restTimerKey(routineId, date));
+  } catch {
+    // ignore
+  }
+}
+
+export type RestTimerSnapshot = { endsAt: number; totalSec: number };
+
+function restTimerKey(routineId: string, date: string): string {
+  return `${PREFIX}rest:${routineId}:${date}`;
+}
+
+/** 백그라운드·탭 복귀 후에도 휴식 타이머를 복원하기 위해 sessionStorage에 보관 */
+export function loadRestTimerState(
+  routineId: string,
+  date: string
+): RestTimerSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(restTimerKey(routineId, date));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as RestTimerSnapshot;
+    if (
+      typeof data?.endsAt !== "number" ||
+      typeof data?.totalSec !== "number" ||
+      !Number.isFinite(data.endsAt) ||
+      !Number.isFinite(data.totalSec)
+    ) {
+      return null;
+    }
+    if (data.endsAt <= Date.now()) {
+      sessionStorage.removeItem(restTimerKey(routineId, date));
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function saveRestTimerState(
+  routineId: string,
+  date: string,
+  state: RestTimerSnapshot
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(restTimerKey(routineId, date), JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearRestTimerState(routineId: string, date: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(restTimerKey(routineId, date));
   } catch {
     // ignore
   }

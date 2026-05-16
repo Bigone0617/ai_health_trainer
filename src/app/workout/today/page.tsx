@@ -15,8 +15,11 @@ import {
 import { loadRestSeconds } from "@/lib/restTimerSettings";
 import type { Routine, RoutineExercise } from "@/lib/types";
 import {
+  clearRestTimerState,
   clearWorkoutDraft,
+  loadRestTimerState,
   loadWorkoutDraft,
+  saveRestTimerState,
   saveWorkoutDraft,
 } from "@/lib/workoutDraftStorage";
 import {
@@ -83,22 +86,42 @@ function WorkoutRoutineInputs({
   const [restSession, setRestSession] = useState<{
     endsAt: number;
     totalSec: number;
-  } | null>(null);
+  } | null>(() => loadRestTimerState(routine.id, todayStr));
   /** 타이머 UI를 주기적으로 다시 그리기 위한 틱(백그라운드 복귀 시에도 endsAt 기준으로 맞춤) */
   const [restTick, setRestTick] = useState(0);
   const restSessionRef = useRef(restSession);
   const hideAfterZeroRef = useRef(false);
+  const hideRestTimeoutRef = useRef<number | null>(null);
   const restChimePlayedRef = useRef(false);
   const restChimeAudioRef = useRef<HTMLAudioElement | null>(null);
   const restEndNotifiedRef = useRef(false);
 
+  const clearHideRestTimeout = useCallback(() => {
+    if (hideRestTimeoutRef.current != null) {
+      window.clearTimeout(hideRestTimeoutRef.current);
+      hideRestTimeoutRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     void registerRestTimerServiceWorker();
-  }, []);
+    const restored = loadRestTimerState(routine.id, todayStr);
+    if (restored) {
+      scheduleRestEndInServiceWorker(restored.endsAt);
+    }
+  }, [routine.id, todayStr]);
 
   useEffect(() => {
     restSessionRef.current = restSession;
   }, [restSession]);
+
+  useEffect(() => {
+    if (restSession) {
+      saveRestTimerState(routine.id, todayStr, restSession);
+    } else {
+      clearRestTimerState(routine.id, todayStr);
+    }
+  }, [restSession, routine.id, todayStr]);
 
   void restTick;
   const restSecondsLeft =
@@ -113,6 +136,7 @@ function WorkoutRoutineInputs({
 
   useEffect(() => {
     if (restSession === null) {
+      clearHideRestTimeout();
       hideAfterZeroRef.current = false;
       restChimePlayedRef.current = false;
       restEndNotifiedRef.current = false;
@@ -147,8 +171,13 @@ function WorkoutRoutineInputs({
         }
         if (!hideAfterZeroRef.current) {
           hideAfterZeroRef.current = true;
-          window.setTimeout(() => {
-            setRestSession(null);
+          clearHideRestTimeout();
+          hideRestTimeoutRef.current = window.setTimeout(() => {
+            hideRestTimeoutRef.current = null;
+            const current = restSessionRef.current;
+            if (current && Date.now() >= current.endsAt) {
+              setRestSession(null);
+            }
             hideAfterZeroRef.current = false;
           }, 600);
         }
@@ -166,10 +195,32 @@ function WorkoutRoutineInputs({
 
     return () => {
       window.clearInterval(id);
+      clearHideRestTimeout();
       document.removeEventListener("visibilitychange", onResume);
       window.removeEventListener("pageshow", onResume);
     };
-  }, [restSession]);
+  }, [restSession, clearHideRestTimeout]);
+
+  useEffect(() => {
+    const restoreRestIfNeeded = () => {
+      if (document.visibilityState !== "visible") return;
+      const saved = loadRestTimerState(routine.id, todayStr);
+      if (!saved) return;
+      const current = restSessionRef.current;
+      if (current?.endsAt === saved.endsAt) return;
+      hideAfterZeroRef.current = false;
+      clearHideRestTimeout();
+      setRestSession(saved);
+      scheduleRestEndInServiceWorker(saved.endsAt);
+      setRestTick((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", restoreRestIfNeeded);
+    window.addEventListener("pageshow", restoreRestIfNeeded);
+    return () => {
+      document.removeEventListener("visibilitychange", restoreRestIfNeeded);
+      window.removeEventListener("pageshow", restoreRestIfNeeded);
+    };
+  }, [routine.id, todayStr, clearHideRestTimeout]);
 
   const draftRef = useRef({ inputs, setChecks });
   useEffect(() => {
@@ -202,6 +253,7 @@ function WorkoutRoutineInputs({
   }, [routine.id, todayStr]);
 
   const startRestTimer = useCallback(() => {
+    clearHideRestTimeout();
     hideAfterZeroRef.current = false;
     restChimePlayedRef.current = false;
     restEndNotifiedRef.current = false;
@@ -214,11 +266,14 @@ function WorkoutRoutineInputs({
     const sec = loadRestSeconds();
     const endsAt = Date.now() + sec * 1000;
     scheduleRestEndInServiceWorker(endsAt);
-    setRestSession({ endsAt, totalSec: sec });
+    const session = { endsAt, totalSec: sec };
+    saveRestTimerState(routine.id, todayStr, session);
+    setRestSession(session);
     setRestTick((n) => n + 1);
-  }, []);
+  }, [clearHideRestTimeout, routine.id, todayStr]);
 
   const skipRestTimer = useCallback(() => {
+    clearHideRestTimeout();
     const a = restChimeAudioRef.current;
     if (a) {
       a.pause();
@@ -227,9 +282,10 @@ function WorkoutRoutineInputs({
     restChimePlayedRef.current = false;
     restEndNotifiedRef.current = false;
     cancelRestEndInServiceWorker();
+    clearRestTimerState(routine.id, todayStr);
     setRestSession(null);
     hideAfterZeroRef.current = false;
-  }, []);
+  }, [clearHideRestTimeout, routine.id, todayStr]);
 
   const updateSet = useCallback(
     (exerciseId: string, setIndex: number, patch: Partial<SetInput>) => {
