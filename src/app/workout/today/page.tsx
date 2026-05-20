@@ -13,6 +13,7 @@ import {
   showRestEndedNotification,
 } from "@/lib/restEndNotification";
 import { loadRestSeconds } from "@/lib/restTimerSettings";
+import { useWorkoutScrollRestore } from "@/lib/useWorkoutScrollRestore";
 import type { Routine, RoutineExercise } from "@/lib/types";
 import {
   clearRestTimerState,
@@ -539,6 +540,8 @@ export default function WorkoutTodayPage() {
   const [summary, setSummary] = useState<WorkoutCompletionSummaryItem[] | null>(
     null
   );
+
+  useWorkoutScrollRestore(routine?.id ?? null, todayStr, Boolean(ready && routine));
 
   if (!ready) {
     return (
