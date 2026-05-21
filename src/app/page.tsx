@@ -187,7 +187,7 @@ export default function HomePage() {
               운동 {todayRoutine.exercises.length}개
             </p>
             <Link
-              href="/workout/today"
+              href="/workout/today?start=1"
               className="mt-4 flex min-h-[52px] items-center justify-center rounded-xl bg-emerald-600 text-center text-base font-semibold text-white hover:bg-emerald-700"
             >
               운동 시작

@@ -1,4 +1,5 @@
 import type { Routine, RoutineExercise } from "./types";
+import { clearWorkoutScrollAnchor } from "./workoutScrollStorage";
 
 const PREFIX = "nextset:workoutDraft:";
 const VERSION = 1 as const;
@@ -69,54 +70,12 @@ export function saveWorkoutDraft(
   }
 }
 
-function workoutScrollKey(routineId: string, date: string): string {
-  return `${PREFIX}scroll:${routineId}:${date}`;
-}
-
-export function loadWorkoutScrollY(
-  routineId: string,
-  date: string
-): number | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(workoutScrollKey(routineId, date));
-    if (raw == null) return null;
-    const y = Number(raw);
-    return Number.isFinite(y) && y >= 0 ? y : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveWorkoutScrollY(
-  routineId: string,
-  date: string,
-  y: number
-): void {
-  if (typeof window === "undefined") return;
-  if (!Number.isFinite(y) || y < 0) return;
-  try {
-    sessionStorage.setItem(workoutScrollKey(routineId, date), String(Math.round(y)));
-  } catch {
-    // ignore
-  }
-}
-
-export function clearWorkoutScrollY(routineId: string, date: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    sessionStorage.removeItem(workoutScrollKey(routineId, date));
-  } catch {
-    // ignore
-  }
-}
-
 export function clearWorkoutDraft(routineId: string, date: string): void {
   if (typeof window === "undefined") return;
+  clearWorkoutScrollAnchor(routineId, date);
   try {
     sessionStorage.removeItem(workoutDraftKey(routineId, date));
     sessionStorage.removeItem(restTimerKey(routineId, date));
-    sessionStorage.removeItem(workoutScrollKey(routineId, date));
   } catch {
     // ignore
   }

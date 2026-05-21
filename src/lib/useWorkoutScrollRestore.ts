@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect } from "react";
+import type { Routine } from "@/lib/types";
 import {
-  loadWorkoutScrollY,
-  saveWorkoutScrollY,
-} from "@/lib/workoutDraftStorage";
+  findFirstUncheckedSet,
+  loadWorkoutScrollAnchor,
+  saveWorkoutScrollAnchor,
+  scrollYForDoneAnchor,
+  workoutDoneElementId,
+} from "@/lib/workoutScrollStorage";
 
 function scrollToY(y: number) {
   window.scrollTo({ top: y, left: 0, behavior: "instant" });
 }
 
-/** 레이아웃·자식 렌더 후에도 맞추기 위해 몇 번 재시도 */
 function restoreScrollY(y: number) {
   scrollToY(y);
   requestAnimationFrame(() => {
@@ -21,33 +24,57 @@ function restoreScrollY(y: number) {
   window.setTimeout(() => scrollToY(y), 200);
 }
 
+function scrollToDoneAnchor(exerciseId: string, setIndex: number, scrollY: number) {
+  const el = document.getElementById(workoutDoneElementId(exerciseId, setIndex));
+  if (el) {
+    el.scrollIntoView({ block: "start", behavior: "instant" });
+  }
+  restoreScrollY(scrollY);
+}
+
 /**
- * 오늘 운동 화면 스크롤 위치를 sessionStorage에 저장하고 복원합니다.
- * 다른 앱으로 갔다 오거나 탭이 다시 그려져도 이전 위치로 돌아갑니다.
+ * 운동 중 첫 미완료 「완료」 버튼 위치를 localStorage에 저장·복원합니다.
+ * enabled가 false이면(운동 시작 직후·완료 후) 저장하지 않습니다.
  */
 export function useWorkoutScrollRestore(
-  routineId: string | null,
+  routine: Routine | null,
   date: string,
+  setChecks: Record<string, boolean[]>,
   enabled: boolean
 ): void {
-  useEffect(() => {
-    if (!enabled || !routineId) return;
+  const routineId = routine?.id ?? null;
 
-    const id = routineId;
+  useEffect(() => {
+    if (!enabled || !routine || !routineId) return;
+
     if ("scrollRestoration" in history) {
       history.scrollRestoration = "manual";
     }
 
     const persist = () => {
-      saveWorkoutScrollY(id, date, window.scrollY);
+      const anchor = findFirstUncheckedSet(routine, setChecks);
+      if (!anchor) return;
+      const scrollY = scrollYForDoneAnchor(anchor.exerciseId, anchor.setIndex);
+      if (scrollY == null) return;
+      saveWorkoutScrollAnchor(routineId, date, { ...anchor, scrollY });
     };
 
     const restore = () => {
-      const y = loadWorkoutScrollY(id, date);
-      if (y != null && y > 0) restoreScrollY(y);
+      const saved = loadWorkoutScrollAnchor(routineId, date);
+      if (!saved) return;
+      const current = findFirstUncheckedSet(routine, setChecks);
+      if (
+        !current ||
+        current.exerciseId !== saved.exerciseId ||
+        current.setIndex !== saved.setIndex
+      ) {
+        return;
+      }
+      scrollToDoneAnchor(saved.exerciseId, saved.setIndex, saved.scrollY);
     };
 
     restore();
+    persist();
 
     let scrollDebounce: number | null = null;
     const onScroll = () => {
@@ -63,23 +90,21 @@ export function useWorkoutScrollRestore(
       restore();
     };
 
-    const onPageShow = () => restore();
-
     window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", persist);
-    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("pageshow", restore);
 
     return () => {
       window.removeEventListener("scroll", onScroll);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", persist);
-      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("pageshow", restore);
       if (scrollDebounce != null) window.clearTimeout(scrollDebounce);
       persist();
       if ("scrollRestoration" in history) {
         history.scrollRestoration = "auto";
       }
     };
-  }, [routineId, date, enabled]);
+  }, [routine, routineId, date, setChecks, enabled]);
 }

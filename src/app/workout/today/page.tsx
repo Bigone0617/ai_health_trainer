@@ -1,10 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/Card";
-import { formatLocalDate, getScheduleDayKey } from "@/lib/dateUtils";
+import {
+  formatLocalDate,
+  formatShortDate,
+  getScheduleDayKey,
+} from "@/lib/dateUtils";
+import {
+  buildLastWeekSetsByExercise,
+  findLastWeekWorkoutSession,
+  formatLastWeekSetLine,
+} from "@/lib/lastWeekWorkout";
 import {
   cancelRestEndInServiceWorker,
   registerRestTimerServiceWorker,
@@ -14,6 +23,10 @@ import {
 } from "@/lib/restEndNotification";
 import { loadRestSeconds } from "@/lib/restTimerSettings";
 import { useWorkoutScrollRestore } from "@/lib/useWorkoutScrollRestore";
+import {
+  clearWorkoutScrollAnchor,
+  hasAnySetChecked,
+} from "@/lib/workoutScrollStorage";
 import type { Routine, RoutineExercise } from "@/lib/types";
 import {
   clearRestTimerState,
@@ -73,7 +86,17 @@ function WorkoutRoutineInputs({
   todayStr: string;
   onCompleted: (summary: WorkoutCompletionSummaryItem[]) => void;
 }) {
-  const { completeWorkout } = useNextSet();
+  const { completeWorkout, workoutSessions } = useNextSet();
+
+  const lastWeekSession = useMemo(
+    () => findLastWeekWorkoutSession(workoutSessions, routine.id, todayStr),
+    [workoutSessions, routine.id, todayStr]
+  );
+
+  const lastWeekSetsByExercise = useMemo(
+    () => buildLastWeekSetsByExercise(lastWeekSession, routine),
+    [lastWeekSession, routine]
+  );
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => {
     const d = loadWorkoutDraft(routine.id, todayStr, routine);
     return d?.inputs ?? buildInitialInputs(routine);
@@ -96,6 +119,24 @@ function WorkoutRoutineInputs({
   const restChimePlayedRef = useRef(false);
   const restChimeAudioRef = useRef<HTMLAudioElement | null>(null);
   const restEndNotifiedRef = useRef(false);
+  const scrollInitRef = useRef(false);
+
+  const workoutScrollEnabled = hasAnySetChecked(setChecks);
+
+  useWorkoutScrollRestore(
+    routine,
+    todayStr,
+    setChecks,
+    workoutScrollEnabled
+  );
+
+  useEffect(() => {
+    if (scrollInitRef.current) return;
+    scrollInitRef.current = true;
+    if (!hasAnySetChecked(setChecks)) {
+      clearWorkoutScrollAnchor(routine.id, todayStr);
+    }
+  }, [routine.id, todayStr, setChecks]);
 
   const clearHideRestTimeout = useCallback(() => {
     if (hideRestTimeoutRef.current != null) {
@@ -363,6 +404,13 @@ function WorkoutRoutineInputs({
 
   return (
     <>
+      {lastWeekSession && (
+        <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-400">
+          지난주({formatShortDate(lastWeekSession.date)}) 기록을 세트마다
+          참고할 수 있어요.
+        </p>
+      )}
+
       {restSecondsLeft !== null && (
         <div
           className="fixed bottom-20 left-0 right-0 z-[45] mx-auto max-w-lg px-4 pb-2"
@@ -407,6 +455,7 @@ function WorkoutRoutineInputs({
       {sortExercises(routine.exercises).map((ex) => {
         const rows = inputs[ex.id] ?? [];
         const checks = setChecks[ex.id] ?? [];
+        const lastWeekSets = lastWeekSetsByExercise[ex.id];
         return (
           <Card key={ex.id}>
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
@@ -440,14 +489,23 @@ function WorkoutRoutineInputs({
             </dl>
 
             <div className="mt-4 space-y-3">
-              {rows.map((row, idx) => (
+              {rows.map((row, idx) => {
+                const lastWeek = lastWeekSets?.[idx];
+                return (
                 <div
                   key={idx}
                   className="rounded-xl border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950"
                 >
-                  <p className="text-xs font-semibold text-zinc-500">
-                    {idx + 1}세트
-                  </p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                    <p className="text-xs font-semibold text-zinc-500">
+                      {idx + 1}세트
+                    </p>
+                    {lastWeek && (
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        지난주 {formatLastWeekSetLine(lastWeek)}
+                      </p>
+                    )}
+                  </div>
                   <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                     <div>
                       <label
@@ -508,7 +566,8 @@ function WorkoutRoutineInputs({
                     </label>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </Card>
         );
@@ -525,8 +584,9 @@ function WorkoutRoutineInputs({
   );
 }
 
-export default function WorkoutTodayPage() {
+function WorkoutTodayContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { ready, routines, weeklySchedule } = useNextSet();
 
   const today = useMemo(() => new Date(), []);
@@ -541,7 +601,11 @@ export default function WorkoutTodayPage() {
     null
   );
 
-  useWorkoutScrollRestore(routine?.id ?? null, todayStr, Boolean(ready && routine));
+  useEffect(() => {
+    if (!routine || searchParams.get("start") !== "1") return;
+    clearWorkoutScrollAnchor(routine.id, todayStr);
+    router.replace("/workout/today");
+  }, [routine, todayStr, searchParams, router]);
 
   if (!ready) {
     return (
@@ -647,5 +711,19 @@ export default function WorkoutTodayPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function WorkoutTodayPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center py-20 text-zinc-500">
+          불러오는 중…
+        </div>
+      }
+    >
+      <WorkoutTodayContent />
+    </Suspense>
   );
 }
